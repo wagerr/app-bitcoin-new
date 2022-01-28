@@ -256,6 +256,12 @@ void app_main() {
             }
             PRINTF("\n");
 
+            if (G_swap_state.called_from_swap && cmd.ins != SIGN_PSBT) {
+                PRINTF("Only SIGN_PSBT can be called during swap\n");
+                io_send_sw(SW_INS_NOT_SUPPORTED);
+                return;
+            }
+
             // Dispatch structured APDU command to handler
             apdu_dispatcher(COMMAND_DESCRIPTORS,
                             sizeof(COMMAND_DESCRIPTORS) / sizeof(COMMAND_DESCRIPTORS[0]),
@@ -263,10 +269,12 @@ void app_main() {
                             sizeof(G_command_state),
                             ui_menu_main,
                             &cmd);
-        }
+
+            // TODO: make sure the app exits once signing is done during swap
 #ifndef DISABLE_LEGACY_SUPPORT
-    }
+        }
 #endif
+    }
 }
 
 /**
@@ -423,9 +431,6 @@ __attribute__((section(".boot"))) int main(int arg0) {
             btchip_altcoin_config_t coin_config;
             init_coin_config(&coin_config);
 
-            G_app_mode =
-                APP_MODE_LEGACY;  // in library mode, we currently only run with legacy APDUs
-
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
@@ -459,6 +464,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
     os_boot();
 
     io_reset_timeouts();
+    G_swap_state.called_from_swap = 0;
 
     if (!arg0) {
         // Bitcoin application launched from dashboard
